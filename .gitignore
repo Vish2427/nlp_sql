@@ -1,0 +1,12 @@
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+
+# Ignore virtual environment directories
+nlp2/
+.env
+chroma_data/
+
+# Ignore IDE-specific files
+.idea/
+*.sublime-workspace
