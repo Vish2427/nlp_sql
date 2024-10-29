@@ -4,7 +4,12 @@ import pandas as pd
 import requests
 import re
 from training import run_training
-
+vn=MyVanna(config={
+    'n_results_sql':1,
+    'n_results_documentation':1, 
+    'n_results_ddl':1,
+    'path':"./chroma_data"                        
+                   })
 
 
 def main(vn):
@@ -36,7 +41,9 @@ def submit_question(vn):
         
         # Text input for the question
         question = st.text_input("Enter Question:", value=default_question)
-
+        
+        if st.checkbox("Add to history"):
+            st.session_state.add_to_history_clicked = True
         # Submit button
         if st.button("Submit"):
             if not question:
@@ -59,14 +66,13 @@ def submit_question(vn):
                 st.session_state.sql_query = sql_query
                 st.session_state.submit_clicked = False
                 # Button to add to history, which sets another session flag
-        if st.button("Add to history"):
-            st.session_state.add_to_history_clicked = True
+        
 
-        # Execute add to history logic if add_to_history_clicked flag is set
-        if st.session_state.add_to_history_clicked:
-            id = vn.train(question=st.session_state.question, sql=st.session_state.sql_query)
-            st.session_state.add_id.append(id)
-            st.session_state.add_to_history_clicked = False  # Reset flag
+                # Execute add to history logic if add_to_history_clicked flag is set
+                if st.session_state.add_to_history_clicked:
+                    id = vn.train(question=st.session_state.question, sql=st.session_state.sql_query)
+                    st.session_state.add_id.append(id)
+                    st.session_state.add_to_history_clicked = True  # Reset flag
 
     with col1:
         # Button to reset and give a new question
