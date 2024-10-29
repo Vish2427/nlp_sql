@@ -1,13 +1,13 @@
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 from model_loading import MyVanna
 import streamlit as st
 import pandas as pd
 import requests
 import re
 from training import run_training
-
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 vn=MyVanna(config={
     'n_results_sql':1,
