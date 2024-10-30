@@ -10,8 +10,8 @@ import re
 from training import run_training
 
 vn=MyVanna(config={
-    'n_results_sql':1,
-    'n_results_documentation':1, 
+    'n_results_sql':3,
+    'n_results_documentation':5, 
     'n_results_ddl':1,
     'path':"./chroma_data"                        
                    })
