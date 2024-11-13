@@ -4,6 +4,7 @@ from vanna.base import VannaBase
 from vanna.chromadb import ChromaDB_VectorStore
 from langchain_openai import ChatOpenAI
 import streamlit as st
+import csv
 
 load_dotenv()
 os.environ['OPENAI_API_KEY']=st.secrets["OPENAI_API_KEY"]
@@ -52,3 +53,17 @@ class MyVanna(ChromaDB_VectorStore, MyCustomLLM):
     def __init__(self, config=None):
         ChromaDB_VectorStore.__init__(self, config=config)
         MyCustomLLM.__init__(self, config=config)
+
+
+def client_name_loader():
+    name_to_id = {}
+
+# Read the CSV file
+    with open("client_names.csv", mode="r", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            name_to_id[row["name"]] = row["id"]
+
+    # Sort the dictionary by key (name) in alphabetical order
+    sorted_name_to_id = dict(sorted(name_to_id.items()))
+    return sorted_name_to_id
