@@ -1,64 +1,105 @@
 import pandas as pd
 import streamlit as st
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+credentials_path ="runpod-files-a2225997f03.json"
+
+
 
 def run_training(vanna_object):
-
-    vn=vanna_object
+    ids=[]
     
-    vn.train(ddl="""
-    CREATE TABLE client_campaigns (
-    client_name VARCHAR(255), -- Name of the client
-    channel_name VARCHAR(255), -- ecommerce channel(amazon, flipkart) where the campaign is executed.
-    campaign_name VARCHAR(255), -- Name of the campaign
-    program_type VARCHAR(50), -- Type of advertising program
-    impression INTEGER, -- Number of impressions
-    click INTEGER, -- Number of clicks
-    spend DECIMAL(10,2), -- spend on the campaign for report date
-    sale DECIMAL(10,2), -- sales generated
-    conversion_rate DECIMAL(5,2), -- Orders divided by the number of clicks
-    orders INTEGER, -- Number of orders placed
-    report_date DATE, -- Campaigns data reporting date in yyyy-mm-dd
-    category VARCHAR(100), -- Category of the product being campainged
-    subcategory VARCHAR(100), -- Subcategory of the product being campainged
-    )
-    """)
-    vn.train(ddl="""
-    TABLE client_sku_reports (
-    client_name VARCHAR(255), -- Name of the client
-    channel_name VARCHAR(255), -- ecommerce channel(amazon, flipkart) where the campaign is executed.
-    sku_title VARCHAR(255), -- Title of the SKU/ASIN
-    brand VARCHAR(100), -- Brand of the SKU/ASIN
-    report_date DATE, -- Reporting date of the SKU/ASIN data in yyyy-mm-dd
-    asin_id VARCHAR(100), -- SKU/ASIN of the product
-    bsr INTEGER, -- Best Seller Rank of SKU
-    category VARCHAR(100), -- Category of the SKU
-    subcategory VARCHAR(100), -- Sub-category of the SKU
-    bb_winner BOOLEAN, -- Name of the best buy winner
-    price DECIMAL(10,2), -- Price of the SKU
-    rating DECIMAL(3,2), -- Average rating of the SKU
-    rating_count INTEGER, -- Count of ratings
-    sale DECIMAL(10,2), -- Total sales amount
-    spend DECIMAL(10,2), -- Total spend on advertising
-    orders INTEGER, -- Number of orders placed
-    click INTEGER, -- Number of clicks
-    impression INTEGER, -- Number of impressions
-    is_available BOOLEAN, -- Availability status of the SKU
-    total_clicked_ad_units INTEGER, -- Total clicked ad units on flipkart
-    total_view_ad_units INTEGER, -- Total viewed ad units on fipkart
-    total_clicked_ad_sales DECIMAL(10,2), -- Total sales from clicked ads on flipkart
-    total_view_ad_sales DECIMAL(10,2) -- Total sales from viewed ads on flipkart
-    )
-    """)
-    vn.train(documentation="The Click Through Rate i.e. CTR is defeined as clicks per impression")
-    vn.train(documentation="ROAS stands for “return on ad spend” and is a marketing metric that estimates the amount of revenue earned per spend allocated to advertising.")
-    vn.train(documentation="to calculate CTR over time, such as daily, weekly, or monthly, you'll collect impressions and clicks for each time period and calculate the CTR separately for each interva.")
-    vn.train(documentation="the data is SQLite, Query has to be write according to SQLite.")
-    vn.train(documentation="if question is not related to the data, responsd 'I am not able to answer this question as data is not available.'")
-    vn.train(
-        question="sales in sept 2025",
-        sql="SELECT SUM(sale) AS total_sales FROM client_campaigns WHERE strftime('%Y-%m', report_date) = '2025-09'"
-    )
+    vn=vanna_object
 
+    def get_google_sheet():
+        client = run_credentials()
+        
+        # Open the Google Sheet by name
+        sheet = client.open("nlp_sql")
+        return sheet
+    
+    workbook=get_google_sheet()
+
+    data=workbook.worksheet('testing').get_all_records() 
+
+    def process_inputs(inputs):
+        # Your function that takes various inputs and processes them
+        if 'training_data_type'in inputs and inputs['training_data_type']=='sql':
+            id=vn.train(question=inputs["question"], sql=inputs["content"])
+            ids.append(id)
+
+        if 'training_data_type'in inputs and inputs['training_data_type']=='ddl':
+            id=vn.train(ddl=inputs["content"])
+            ids.append(id)
+
+        if 'training_data_type'in inputs and inputs['training_data_type']=='documentation':
+            id=vn.train(documentation=inputs["content"])
+            ids.append(id)
+
+        if len(inputs.keys())==1 and 'id' in inputs:
+            vn.remove_training_data(inputs['id'])
+
+    table=vn.get_training_data()
+    table_ids=table['id'].unique()
+    del_id= list(set(table_ids)-set(ids))
+    if len(del_id)>0:
+        for dids in del_id:
+            vn.remove_training_data(dids)
+
+    for inputs in data:
+        cleaned_data = {k: v for k, v in inputs.items() if v.strip()}
+        process_inputs(cleaned_data)
+
+    sheet=workbook.worksheet('testing')
+    try:
+        # sheet_ids = data_ids.col_values(1)[1:]
+        # sheet.worksheet('training').delete_rows(2,len(sheet_ids)+1)
+        # data_n=[[i] for i in ids]
+        current_data = sheet.col_values(1)[1:]
+        for i in range(2, len(current_data) + 2):  
+            sheet.update_cell(i, 1, '')
+        all_data = sheet.get_all_values()
+
+        # Iterate from the last row to the first row
+        for i in range(len(all_data), 0, -1):
+            # Check if the row is empty (all values are empty strings)
+            if all(cell == '' for cell in all_data[i - 1]):
+                sheet.delete_rows(i)
+        for i, value in enumerate(ids, start=2):  
+            sheet.update_cell(i, 1, value)
+    except Exception as e:
+        print(e)
+        
+
+def table(vanna_object):
+    vn=vanna_object
+    table=vn.get_training_data()
+    st.session_state.generate_figure=False
+    st.title("Training Data")
+    st.dataframe(table, hide_index=True) 
+
+def run_credentials():
+    credentials = ServiceAccountCredentials.from_json_keyfile_name(
+    credentials_path,
+    scopes=['https://www.googleapis.com/auth/drive']
+    )
+    client = gspread.authorize(credentials)
+    return client
+
+def update_google_sheet(question, Query, status):
+    client = run_credentials()
+    
+    # Open the Google Sheet by name
+    sheet = client.open("nlp_sql").sheet1
+    
+    try:
+        headers = sheet.row_values(1)
+        if headers==[]:
+            sheet.append_row(["Question", "Query", "Status"])
+    except IndexError:
+        # Initialize headers if sheet is empty
+        sheet.append_row(["Question", "Query", "Status"])
+    sheet.append_row([question, Query, status])
 def table(vanna_object):
     vn=vanna_object
     table=vn.get_training_data()
